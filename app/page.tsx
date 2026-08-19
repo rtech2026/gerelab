@@ -1,6 +1,11 @@
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
 import { Studio } from '@/components/studio/studio'
 
-export default function StudioPage() {
+export default async function StudioPage() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) redirect('/sign-in')
   return (
     <main>
       <div className="mx-auto max-w-6xl px-4 pt-8">

@@ -3,13 +3,15 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { AudioWaveform, Settings, KeyRound, Coins } from 'lucide-react'
+import { AudioWaveform, Settings, KeyRound, Coins, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useCredits } from '@/components/credits-provider'
 import { ApiKeyDialog } from '@/components/api-key-dialog'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { signOut, useSession } from '@/lib/auth-client'
 
 const NAV = [
   { href: '/', label: 'Studio' },
@@ -21,7 +23,8 @@ const NAV = [
 
 export function SiteHeader() {
   const pathname = usePathname()
-  const { balance } = useCredits()
+  const { charsRemaining } = useCredits()
+  const { data: session } = useSession()
   const [apiOpen, setApiOpen] = React.useState(false)
 
   return (
@@ -65,7 +68,7 @@ export function SiteHeader() {
             className="hidden gap-1.5 font-mono text-xs font-normal sm:flex"
           >
             <Coins className="size-3 text-brand" />
-            {balance.toLocaleString('pt-BR')} chars
+            {charsRemaining.toLocaleString('pt-BR')} chars
           </Badge>
 
           <Button
@@ -76,9 +79,15 @@ export function SiteHeader() {
           >
             <KeyRound className="size-4" />
           </Button>
+          <ThemeToggle />
           <Button variant="ghost" size="icon-sm" aria-label="Configurações">
             <Settings className="size-4" />
           </Button>
+          {session?.user && (
+            <Button variant="ghost" size="icon-sm" aria-label="Sair" onClick={() => signOut({ fetchOptions: { onSuccess: () => window.location.assign('/sign-in') } })}>
+              <LogOut className="size-4" />
+            </Button>
+          )}
           <Avatar className="size-7">
             <AvatarFallback className="bg-brand/15 text-xs text-brand">
               AV

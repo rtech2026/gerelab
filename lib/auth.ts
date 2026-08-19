@@ -14,7 +14,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
-    minPasswordLength: 8,
+    minPasswordLength: 6,
   },
   trustedOrigins: [
     ...(process.env.NODE_ENV === 'development'

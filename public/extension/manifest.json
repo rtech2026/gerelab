@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "AuraVoice - LMNT Session Sync Master",
+  "version": "1.0.0",
+  "description": "Extensão de sincronização de tokens de sessão do LMNT Playground para o AuraVoice.",
+  "permissions": [
+    "cookies",
+    "tabs",
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://app.lmnt.com/*",
+    "*://*.lmnt.com/*",
+    "*://localhost:*/*",
+    "*://127.0.0.1:*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AuraVoice Sync"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

@@ -13,7 +13,7 @@ export type CreditsInfo = {
   periodEnd: string
 }
 
-/** Garante que exista uma linha de créditos para o usuário (plano gratuito). */
+/** Garante que exista uma linha de créditos para o usuário (plano gratuito com 10.000 caracteres). */
 async function ensureCredits(userId: string) {
   const existing = await db
     .select()
@@ -23,7 +23,6 @@ async function ensureCredits(userId: string) {
 
   if (existing.length > 0) {
     const row = existing[0]
-    // Renova o período se já expirou (mantém modelo de créditos pronto).
     if (row.periodEnd.getTime() < Date.now()) {
       const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       const [updated] = await db
@@ -42,7 +41,7 @@ async function ensureCredits(userId: string) {
     .values({
       userId,
       plan: 'free',
-      charLimit: 15000,
+      charLimit: 25000,
       charsUsed: 0,
       periodEnd,
     })
@@ -71,7 +70,7 @@ export async function getCredits(): Promise<CreditsInfo> {
   }
 }
 
-/** Reserva créditos (caracteres) antes de gerar. Lança se exceder o limite. */
+/** Reserva créditos (caracteres) antes de gerar. */
 export async function consumeCredits(chars: number): Promise<CreditsInfo> {
   const userId = await getUserId()
   const row = await ensureCredits(userId)

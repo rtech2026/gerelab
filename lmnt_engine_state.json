@@ -1,0 +1,22 @@
+{
+  "priorities": [
+    "playground",
+    "api_pool",
+    "edge_tts"
+  ],
+  "session": {
+    "status": "none",
+    "generationCount": 0
+  },
+  "keys": [
+    {
+      "id": "key-default",
+      "key": "ak_nhWTGWch6HYmgfodtppQzZ",
+      "name": "Chave Master Primária",
+      "status": "active",
+      "charsGenerated": 0,
+      "errorCount": 0
+    }
+  ],
+  "currentKeyIndex": 0
+}

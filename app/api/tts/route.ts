@@ -10,11 +10,13 @@ export const maxDuration = 30
 type Body = {
   text?: string
   voiceId?: string
+  voice?: string
   voiceName?: string
   language?: string
   format?: string
   temperature?: number
   topP?: number
+  top_p?: number
 }
 
 const MAX_CHARS = 5000
@@ -33,13 +35,13 @@ export async function POST(req: Request) {
   }
 
   const text = (body.text ?? '').trim()
-  const voiceId = (body.voiceId ?? '').trim()
+  const rawVoiceId = (body.voiceId || body.voice || '').trim()
 
   if (!text) {
-    return NextResponse.json({ error: 'Texto obrigatório' }, { status: 400 })
+    return NextResponse.json({ error: 'Digite um texto para sintetizar' }, { status: 400 })
   }
-  if (!voiceId) {
-    return NextResponse.json({ error: 'Selecione uma voz' }, { status: 400 })
+  if (!rawVoiceId) {
+    return NextResponse.json({ error: 'Selecione uma voz neural' }, { status: 400 })
   }
   if (text.length > MAX_CHARS) {
     return NextResponse.json(
@@ -50,9 +52,9 @@ export async function POST(req: Request) {
 
   const chars = text.length
 
-  // 1. Valida créditos do usuário antes de gastar a chamada.
+  // 1. Valida créditos do usuário antes de gastar a chamada
   const credits = await getCredits()
-  if (chars > credits.charsRemaining) {
+  if (credits && chars > credits.charsRemaining) {
     return NextResponse.json(
       {
         error: `Créditos insuficientes. Restam ${credits.charsRemaining.toLocaleString(
@@ -63,40 +65,43 @@ export async function POST(req: Request) {
     )
   }
 
-  // 2. Sintetiza com a LMNT (chave no servidor).
-  let audio: Buffer
+  // 2. Sintetiza na ordem: LMNT API Pool -> LMNT Session Bypass -> Edge-TTS Failover
+  let synthResult: { buffer: Buffer; engine: string }
   try {
-    audio = await synthesizeSpeech({
+    synthResult = await synthesizeSpeech({
       text,
-      voice: voiceId,
+      voice: rawVoiceId,
       language: body.language,
       format: body.format ?? 'mp3',
       temperature: body.temperature,
-      topP: body.topP,
+      topP: body.topP ?? body.top_p,
     })
   } catch (err) {
-    console.log('[v0] LMNT synth error:', (err as Error).message)
+    console.log('[GereLab TTS] Pipeline synth error:', (err as Error).message)
     return NextResponse.json(
-      { error: 'Falha na síntese de voz (LMNT)' },
+      { error: 'Falha na síntese de voz. Verifique a voz selecionada ou tente novamente.' },
       { status: 502 },
     )
   }
 
-  // 3. Consome créditos e registra o histórico.
-  let remaining = credits.charsRemaining - chars
+  const audio = synthResult.buffer
+  const engineUsed = synthResult.engine
+
+  // 3. Consome créditos e registra o histórico
+  let remaining = (credits?.charsRemaining || 0) - chars
   try {
     const updated = await consumeCredits(chars)
-    remaining = updated.charsRemaining
+    if (updated) remaining = updated.charsRemaining
     await saveGeneration({
       text,
-      voiceId,
-      voiceName: body.voiceName ?? voiceId,
-      language: body.language ?? null,
-      format: body.format ?? 'mp3',
+      voiceId: rawVoiceId,
+      voiceName: body.voiceName || rawVoiceId,
+      language: body.language || null,
+      format: body.format || 'mp3',
       charCount: chars,
     })
   } catch (err) {
-    console.log('[v0] credits/history error:', (err as Error).message)
+    console.log('[GereLab TTS] credits/history error:', (err as Error).message)
   }
 
   const contentType = body.format === 'wav' ? 'audio/wav' : 'audio/mpeg'
@@ -106,7 +111,7 @@ export async function POST(req: Request) {
       'Content-Type': contentType,
       'Content-Length': audio.length.toString(),
       'Cache-Control': 'no-store',
-      'X-Aura-Engine': 'lmnt',
+      'X-Aura-Engine': engineUsed,
       'X-Aura-Credits-Remaining': String(remaining),
       'X-Content-Type-Options': 'nosniff',
     },

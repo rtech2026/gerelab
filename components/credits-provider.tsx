@@ -11,7 +11,8 @@ type CreditsContextValue = {
   charsRemaining: number
   periodEnd: string | null
   loading: boolean
-  refresh: () => void
+  refresh: () => Promise<void>
+  refreshCredits: () => Promise<void>
   setRemaining: (remaining: number) => void
 }
 
@@ -55,12 +56,13 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
 
   const value: CreditsContextValue = {
     plan: info?.plan ?? 'free',
-    charLimit: info?.charLimit ?? 15000,
+    charLimit: info?.charLimit ?? 25000,
     charsUsed: info?.charsUsed ?? 0,
     charsRemaining: info?.charsRemaining ?? 0,
     periodEnd: info?.periodEnd ?? null,
     loading,
     refresh,
+    refreshCredits: refresh,
     setRemaining,
   }
 

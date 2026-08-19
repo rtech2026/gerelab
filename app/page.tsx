@@ -7,16 +7,10 @@ export default async function StudioPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/sign-in')
   return (
-    <main>
-      <div className="mx-auto max-w-6xl px-4 pt-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Studio
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Converta texto em voz neural realista com controle de estúdio.
-        </p>
+    <main className="min-h-[calc(100vh-4rem)] bg-background">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <Studio />
       </div>
-      <Studio />
     </main>
   )
 }

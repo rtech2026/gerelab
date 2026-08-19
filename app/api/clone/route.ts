@@ -3,6 +3,7 @@ import { createVoice } from '@/lib/lmnt'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { clonedVoice } from '@/lib/db/schema'
+import { consumeCredits, getCredits } from '@/app/actions/credits'
 import {
   normalizeGender,
   parseLanguage,
@@ -11,6 +12,8 @@ import {
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
+
+const CLONE_CREDIT_COST = 1000
 
 export async function POST(req: Request) {
   const session = await getSession()
@@ -32,21 +35,14 @@ export async function POST(req: Request) {
   const description =
     (form.get('description') as string | null)?.trim() || undefined
   const gender = (form.get('gender') as string | null)?.trim() || undefined
-  const consent = form.get('consent') === 'true'
-  const file = form.get('audio')
+  const file = form.get('file') || form.get('audio')
 
   if (!name) {
     return NextResponse.json({ error: 'Nome da voz obrigatório' }, { status: 400 })
   }
-  if (!consent) {
-    return NextResponse.json(
-      { error: 'É necessário confirmar o consentimento' },
-      { status: 400 },
-    )
-  }
   if (!(file instanceof File) || file.size === 0) {
     return NextResponse.json(
-      { error: 'Amostra de áudio obrigatória' },
+      { error: 'Amostra de áudio obrigatória (mínimo de 10 segundos)' },
       { status: 400 },
     )
   }
@@ -54,6 +50,23 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: 'Amostra muito grande (máx. 25MB)' },
       { status: 400 },
+    )
+  }
+
+  // Verifica e debita 1.000 créditos
+  try {
+    const credits = await getCredits()
+    if (credits.charsRemaining < CLONE_CREDIT_COST) {
+      return NextResponse.json(
+        { error: `Créditos insuficientes. A clonagem requer ${CLONE_CREDIT_COST.toLocaleString('pt-BR')} créditos (você tem ${credits.charsRemaining.toLocaleString('pt-BR')}).` },
+        { status: 402 },
+      )
+    }
+    await consumeCredits(CLONE_CREDIT_COST)
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message === 'LIMIT_EXCEEDED' ? 'Limite mensal de créditos atingido.' : 'Erro ao processar créditos.' },
+      { status: 402 },
     )
   }
 
@@ -70,7 +83,7 @@ export async function POST(req: Request) {
         gender: created.gender ?? null,
       })
     } catch (err) {
-      console.log('[v0] save cloned voice error:', (err as Error).message)
+      console.log('[Clone] save cloned voice error:', (err as Error).message)
     }
 
     const { language, accent } = parseLanguage(created.description)
@@ -90,9 +103,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ voice })
   } catch (err) {
-    console.log('[v0] LMNT clone error:', (err as Error).message)
+    console.log('[Clone] LMNT clone error:', (err as Error).message)
     return NextResponse.json(
-      { error: 'Falha ao clonar a voz na LMNT' },
+      { error: 'Falha ao processar clonagem de voz.' },
       { status: 502 },
     )
   }

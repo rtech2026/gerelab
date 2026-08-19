@@ -76,7 +76,7 @@ export const verification = pgTable('verification', {
 export const userCredits = pgTable('av_user_credits', {
   userId: text('userId').primaryKey(),
   plan: text('plan').notNull().default('free'),
-  charLimit: integer('char_limit').notNull().default(15000),
+  charLimit: integer('char_limit').notNull().default(10000),
   charsUsed: integer('chars_used').notNull().default(0),
   periodEnd: timestamp('period_end').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),

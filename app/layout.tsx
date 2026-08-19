@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'AuraVoice Studio — Neural Text-to-Speech & Voice Cloning',
+  title: 'GereLab — Modular Neural Voice Engine — Neural Text-to-Speech & Voice Cloning',
   description:
     'Estúdio de voz neural realista com síntese em tempo real, clonagem instantânea de voz e exportação de áudio de estúdio.',
   generator: 'v0.app',
@@ -31,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning className={`bg-background ${geistSans.variable} ${geistMono.variable}`}>
-      <body className="min-h-screen bg-background font-sans antialiased">
+      <body suppressHydrationWarning className="min-h-screen bg-background font-sans antialiased">
         <ThemeProvider>
           <AppShell>{children}</AppShell>
           <Toaster position="top-center" />

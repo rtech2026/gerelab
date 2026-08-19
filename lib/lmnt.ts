@@ -1,15 +1,19 @@
+import { getActiveApiKey, getEngineState, reportKeyQuotaExceeded } from '@/lib/lmnt-state';
+
 const LMNT_BASE = 'https://api.lmnt.com'
 const LMNT_VERSION = '1.2'
 
-function apiKey() {
-  const key = process.env.LMNT_API_KEY
-  if (!key) throw new Error('LMNT_API_KEY não configurada')
-  return key
+function getApiKey() {
+  const poolKey = getActiveApiKey();
+  if (poolKey) return poolKey;
+  const key = process.env.LMNT_API_KEY;
+  if (!key) throw new Error('Nenhuma chave LMNT ativa no Pool');
+  return key;
 }
 
-function headers(extra: Record<string, string> = {}) {
+function getHeaders(key: string, extra: Record<string, string> = {}) {
   return {
-    'X-API-Key': apiKey(),
+    'X-API-Key': key,
     'lmnt-version': LMNT_VERSION,
     ...extra,
   }
@@ -33,8 +37,9 @@ export type LmntVoice = {
 export async function listVoices(
   owner: 'system' | 'me' | 'all' = 'all',
 ): Promise<LmntVoice[]> {
+  const key = getApiKey();
   const res = await fetch(`${LMNT_BASE}/v1/ai/voice/list?owner=${owner}`, {
-    headers: headers(),
+    headers: getHeaders(key),
     cache: 'no-store',
   })
   if (!res.ok) {
@@ -58,8 +63,9 @@ export type LmntAccount = {
 
 export async function getAccount(): Promise<LmntAccount | null> {
   try {
+    const key = getApiKey();
     const res = await fetch(`${LMNT_BASE}/v1/account`, {
-      headers: headers(),
+      headers: getHeaders(key),
       cache: 'no-store',
     })
     if (!res.ok) return null
@@ -84,7 +90,8 @@ export type SynthesizeInput = {
 
 export async function synthesizeSpeech(
   input: SynthesizeInput,
-): Promise<Buffer> {
+): Promise<{ buffer: Buffer; engine: string }> {
+  const state = getEngineState();
   const body: Record<string, unknown> = {
     text: input.text,
     voice: input.voice,
@@ -96,23 +103,67 @@ export async function synthesizeSpeech(
   if (typeof input.topP === 'number') body.top_p = input.topP
   if (input.model) body.model = input.model
 
-  const res = await fetch(`${LMNT_BASE}/v1/ai/speech/bytes`, {
-    method: 'POST',
-    headers: headers({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  })
-
-  if (!res.ok) {
-    let detail = ''
+  // 1. Tenta Playground Session se ativa
+  if (state.session?.status === 'active' && state.session.playgroundSessionToken) {
     try {
-      const j = await res.json()
-      detail = j?.error?.message ?? ''
-    } catch {}
-    throw new Error(`LMNT speech ${res.status}${detail ? `: ${detail}` : ''}`)
+      const playgroundHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'lmnt-version': LMNT_VERSION,
+        'Authorization': `Bearer ${state.session.playgroundSessionToken}`
+      };
+      if (state.session.cookieHeader) {
+        playgroundHeaders['Cookie'] = state.session.cookieHeader;
+      }
+      const pRes = await fetch(`${LMNT_BASE}/v1/ai/speech/bytes`, {
+        method: 'POST',
+        headers: playgroundHeaders,
+        body: JSON.stringify(body)
+      });
+      if (pRes.ok) {
+        const arr = await pRes.arrayBuffer();
+        return { buffer: Buffer.from(arr), engine: 'lmnt-playground-bypass' };
+      }
+    } catch (err) {
+      console.log('[LMNT Bypass] Session error, failing over to API pool...');
+    }
   }
 
-  const arr = await res.arrayBuffer()
-  return Buffer.from(arr)
+  // 2. Pool de Chaves API LMNT com rotação
+  const activeKeys = state.keys.filter(k => k.status === 'active');
+  for (const k of activeKeys) {
+    try {
+      const res = await fetch(`${LMNT_BASE}/v1/ai/speech/bytes`, {
+        method: 'POST',
+        headers: getHeaders(k.key, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        const arr = await res.arrayBuffer();
+        return { buffer: Buffer.from(arr), engine: 'lmnt-api-pool' };
+      }
+
+      if (res.status === 429 || res.status === 402) {
+        console.log(`[LMNT Pool] Cota atingida para chave ${k.name}, marcando quota_exceeded`);
+        reportKeyQuotaExceeded(k.key);
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        console.log(`[LMNT Pool] Erro na síntese com chave ${k.name}: ${res.status}`, errJson);
+      }
+    } catch (err) {
+      console.log(`[LMNT Pool] Erro na chave ${k.name}:`, (err as Error).message);
+    }
+  }
+
+  // 3. Fallback inteligente Edge-TTS gratuito
+  try {
+    const { synthesizeEdgeTTS } = await import('@/lib/edge-tts');
+    const edgeBuffer = await synthesizeEdgeTTS(input.text, input.voice);
+    return { buffer: edgeBuffer, engine: 'edge-tts-failover' };
+  } catch (err) {
+    console.log('[GereLab TTS] Edge failover error:', (err as Error).message);
+    throw new Error('Falha em todos os pipelines de síntese de voz');
+  }
 }
 
 /* -------------------------------- Clone --------------------------------- */
@@ -128,6 +179,7 @@ export type CreateVoiceInput = {
 export async function createVoice(
   input: CreateVoiceInput,
 ): Promise<LmntVoice> {
+  const key = getApiKey();
   const form = new FormData()
   form.append('name', input.name)
   form.append('file', input.file, input.file.name || 'sample.wav')
@@ -137,7 +189,7 @@ export async function createVoice(
 
   const res = await fetch(`${LMNT_BASE}/v1/ai/voice`, {
     method: 'POST',
-    headers: headers(),
+    headers: getHeaders(key),
     body: form,
   })
 

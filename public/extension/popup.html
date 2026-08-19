@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>AuraVoice Sync Master</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body { width: 340px; background: #09090b; color: #f4f4f5; padding: 16px; border: 1px solid rgba(255,255,255,0.1); }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: #10b981; }
+    .badge { font-size: 10px; font-weight: 700; background: rgba(16,185,129,0.15); color: #34d399; padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(16,185,129,0.3); }
+    .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .label { font-size: 11px; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .value { font-size: 12px; color: #e4e4e7; word-break: break-all; font-family: monospace; }
+    .status { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #71717a; }
+    .status-dot.active { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .status-dot.error { background: #ef4444; }
+    .btn { width: 100%; padding: 10px; background: #10b981; color: #000; font-weight: 700; font-size: 13px; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; }
+    .btn:hover { background: #34d399; transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: rgba(255,255,255,0.08); color: #fff; margin-top: 8px; }
+    .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+    .log-box { margin-top: 10px; font-size: 11px; color: #71717a; max-height: 80px; overflow-y: auto; line-height: 1.4; background: #000; padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); }
+    .link { color: #34d399; text-decoration: none; cursor: pointer; }
+    .link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></svg>
+      AuraVoice Sync
+    </div>
+    <span class="badge">V1.0</span>
+  </div>
+
+  <div class="card">
+    <div class="label">Status da Conexão</div>
+    <div class="status" id="statusContainer">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Pronto para sincronizar</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">Destino do Servidor</div>
+    <input type="text" id="targetUrl" value="http://localhost:3000/api/admin/lmnt-session" style="width: 100%; background: #18181b; border: 1px solid rgba(255,255,255,0.1); color: #34d399; padding: 6px; border-radius: 4px; font-size: 11px; font-family: monospace;">
+  </div>
+
+  <button class="btn" id="syncBtn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+    Puxar & Enviar Token de Sessão
+  </button>
+
+  <button class="btn btn-secondary" id="openLmntBtn">
+    Abrir app.lmnt.com
+  </button>
+
+  <div class="log-box" id="logBox">Aguardando comando...</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

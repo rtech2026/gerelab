@@ -21,14 +21,7 @@ import {
 } from '@/components/ui/empty'
 import { VoicePreviewButton } from '@/components/voice-preview-button'
 import { useVoices } from '@/components/voices-provider'
-import type { Voice } from '@/lib/voices'
-
-const FILTERS = [
-  { value: 'all', label: 'Todas' },
-  { value: 'PT-BR', label: 'PT-BR' },
-  { value: 'EN-US', label: 'EN-US' },
-  { value: 'ES-ES', label: 'ES-ES' },
-]
+import { genderLabel, type Voice } from '@/lib/voices'
 
 function VoiceCard({
   voice,
@@ -46,14 +39,11 @@ function VoiceCard({
               {voice.name.slice(0, 1)}
             </div>
             <div>
-              <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <p className="text-sm font-medium text-foreground">
                 {voice.name}
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {voice.flag}
-                </span>
               </p>
               <p className="text-xs text-muted-foreground">
-                {voice.accent} · {voice.gender === 'male' ? 'Masculina' : 'Feminina'}
+                {voice.language} · {genderLabel(voice.gender)}
               </p>
             </div>
           </div>
@@ -61,11 +51,11 @@ function VoiceCard({
             <Badge variant="secondary" className="text-[10px]">
               Clone
             </Badge>
-          ) : (
+          ) : voice.accent ? (
             <Badge variant="outline" className="text-[10px]">
-              {voice.langCode}
+              {voice.accent}
             </Badge>
-          )}
+          ) : null}
         </div>
 
         <p className="line-clamp-2 min-h-8 text-xs leading-relaxed text-muted-foreground">
@@ -103,11 +93,25 @@ function VoiceCard({
 }
 
 export function LibraryView() {
-  const { native, cloned, removeCloned } = useVoices()
+  const { native, cloned, removeCloned, loading } = useVoices()
   const [filter, setFilter] = React.useState('all')
 
+  const languages = React.useMemo(() => {
+    const set = new Set<string>()
+    native.forEach((v) => set.add(v.language))
+    return Array.from(set).sort()
+  }, [native])
+
+  const FILTERS = React.useMemo(
+    () => [
+      { value: 'all', label: 'Todas' },
+      ...languages.map((l) => ({ value: l, label: l })),
+    ],
+    [languages],
+  )
+
   const filteredNative = native.filter(
-    (v) => filter === 'all' || v.langCode === filter,
+    (v) => filter === 'all' || v.language === filter,
   )
 
   return (
@@ -168,7 +172,7 @@ export function LibraryView() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {cloned
-              .filter((v) => filter === 'all' || v.langCode === filter)
+              .filter((v) => filter === 'all' || v.language === filter)
               .map((v) => (
                 <VoiceCard key={v.id} voice={v} onDelete={removeCloned} />
               ))}
@@ -180,6 +184,15 @@ export function LibraryView() {
       <section className="mt-10">
         <h2 className="mb-3 text-sm font-medium text-foreground">
           Vozes nativas
+          {loading ? (
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              carregando…
+            </span>
+          ) : (
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              {filteredNative.length}
+            </span>
+          )}
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredNative.map((v) => (

@@ -1,105 +1,82 @@
 export type VoiceCategory = 'native' | 'cloned'
+export type VoiceGender = 'male' | 'female' | 'neutral'
 
+/** App-facing voice shape, derived from the LMNT voice object. */
 export type Voice = {
   id: string
   name: string
-  /** Provider voice id used by the Edge Neural TTS fallback */
-  edgeVoice: string
-  language: string
-  langCode: string
-  flag: string
-  gender: 'male' | 'female'
-  accent: string
   description: string
+  gender: VoiceGender
+  owner: 'system' | 'me' | 'other'
   category: VoiceCategory
   tags: string[]
+  previewUrl: string
+  state: string
+  /** Best-effort language/accent label parsed from the LMNT description. */
+  language: string
+  accent: string
+}
+
+export function normalizeGender(g?: string | null): VoiceGender {
+  const v = (g ?? '').toLowerCase()
+  if (v.startsWith('m')) return 'male'
+  if (v.startsWith('f')) return 'female'
+  return 'neutral'
+}
+
+export function genderLabel(g: VoiceGender): string {
+  return g === 'male' ? 'Masculina' : g === 'female' ? 'Feminina' : 'Neutra'
 }
 
 /**
- * Curated native voices. `edgeVoice` maps to Microsoft Edge Neural voices used
- * by the free fallback engine so previews work without any API key.
+ * Parse a display language/accent out of an LMNT description string, e.g.
+ * "Narrative. Excited. US" -> { language: 'Inglês (US)', accent: 'US' }.
  */
-export const NATIVE_VOICES: Voice[] = [
+export function parseLanguage(description?: string | null): {
+  language: string
+  accent: string
+} {
+  const d = (description ?? '').trim()
+  const map: Record<string, string> = {
+    US: 'Inglês (US)',
+    UK: 'Inglês (UK)',
+    AU: 'Inglês (AU)',
+    BR: 'Português (BR)',
+    PT: 'Português (PT)',
+    ES: 'Espanhol',
+    FR: 'Francês',
+    DE: 'Alemão',
+    IT: 'Italiano',
+    JP: 'Japonês',
+    KR: 'Coreano',
+    CN: 'Chinês',
+    IN: 'Inglês (IN)',
+  }
+  const tokens = d.split(/[.\s]+/).map((t) => t.trim())
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const key = tokens[i].toUpperCase()
+    if (map[key]) return { language: map[key], accent: key }
+  }
+  return { language: 'Multilíngue', accent: '' }
+}
+
+/** Minimal offline fallback (real LMNT system voice ids). */
+export const FALLBACK_VOICES: Voice[] = [
   {
-    id: 'ptbr-antonio',
-    name: 'Antonio',
-    edgeVoice: 'pt-BR-AntonioNeural',
-    language: 'Português (Brasil)',
-    langCode: 'PT-BR',
-    flag: 'BR',
-    gender: 'male',
-    accent: 'Neutro',
-    description: 'Locução masculina calorosa, ideal para narração e podcasts.',
-    category: 'native',
-    tags: ['Narração', 'Podcast'],
-  },
-  {
-    id: 'ptbr-francisca',
-    name: 'Francisca',
-    edgeVoice: 'pt-BR-FranciscaNeural',
-    language: 'Português (Brasil)',
-    langCode: 'PT-BR',
-    flag: 'BR',
+    id: 'leah',
+    name: 'Leah',
+    description: 'Voz feminina versátil e natural.',
     gender: 'female',
-    accent: 'Neutro',
-    description: 'Voz feminina expressiva e versátil para qualquer conteúdo.',
+    owner: 'system',
     category: 'native',
-    tags: ['Comercial', 'E-learning'],
-  },
-  {
-    id: 'ptbr-thalita',
-    name: 'Thalita',
-    edgeVoice: 'pt-BR-ThalitaMultilingualNeural',
-    language: 'Português (Brasil)',
-    langCode: 'PT-BR',
-    flag: 'BR',
-    gender: 'female',
-    accent: 'Multilíngue',
-    description: 'Timbre jovem e natural, excelente para redes sociais.',
-    category: 'native',
-    tags: ['Social', 'Multilíngue'],
-  },
-  {
-    id: 'enus-andrew',
-    name: 'Andrew',
-    edgeVoice: 'en-US-AndrewMultilingualNeural',
-    language: 'English (US)',
-    langCode: 'EN-US',
-    flag: 'US',
-    gender: 'male',
-    accent: 'American',
-    description: 'Confident, conversational tone for product and ads.',
-    category: 'native',
-    tags: ['Commercial', 'Conversational'],
-  },
-  {
-    id: 'enus-ava',
-    name: 'Ava',
-    edgeVoice: 'en-US-AvaMultilingualNeural',
-    language: 'English (US)',
-    langCode: 'EN-US',
-    flag: 'US',
-    gender: 'female',
-    accent: 'American',
-    description: 'Crisp, friendly delivery tuned for assistants and UI.',
-    category: 'native',
-    tags: ['Assistant', 'UI'],
-  },
-  {
-    id: 'eses-alvaro',
-    name: 'Álvaro',
-    edgeVoice: 'es-ES-AlvaroNeural',
-    language: 'Español (España)',
-    langCode: 'ES-ES',
-    flag: 'ES',
-    gender: 'male',
-    accent: 'Castellano',
-    description: 'Locución profesional con dicción clara y neutra.',
-    category: 'native',
-    tags: ['Locución', 'Corporativo'],
+    tags: [],
+    previewUrl: 'https://api.lmnt.com/v1/ai/voice/leah/preview',
+    state: 'ready',
+    language: 'Multilíngue',
+    accent: '',
   },
 ]
 
-export function getVoiceById(id: string, extra: Voice[] = []): Voice | undefined {
-  return [...NATIVE_VOICES, ...extra].find((v) => v.id === id)
+export function getVoiceById(id: string, list: Voice[] = []): Voice | undefined {
+  return [...list, ...FALLBACK_VOICES].find((v) => v.id === id)
 }

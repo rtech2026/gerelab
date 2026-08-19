@@ -1,12 +1,18 @@
 'use client'
 
 import * as React from 'react'
+import { getCredits, type CreditsInfo } from '@/app/actions/credits'
+import { useSession } from '@/lib/auth-client'
 
 type CreditsContextValue = {
-  balance: number
   plan: string
-  spend: (chars: number) => void
-  add: (chars: number) => void
+  charLimit: number
+  charsUsed: number
+  charsRemaining: number
+  periodEnd: string | null
+  loading: boolean
+  refresh: () => void
+  setRemaining: (remaining: number) => void
 }
 
 const CreditsContext = React.createContext<CreditsContextValue | null>(null)
@@ -18,18 +24,47 @@ export function useCredits() {
 }
 
 export function CreditsProvider({ children }: { children: React.ReactNode }) {
-  const [balance, setBalance] = React.useState(12450)
-  const [plan] = React.useState('Starter')
+  const { data: sessionData } = useSession()
+  const [info, setInfo] = React.useState<CreditsInfo | null>(null)
+  const [loading, setLoading] = React.useState(false)
 
-  const spend = React.useCallback(
-    (chars: number) => setBalance((b) => Math.max(0, b - chars)),
-    [],
-  )
-  const add = React.useCallback((chars: number) => setBalance((b) => b + chars), [])
+  const refresh = React.useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await getCredits()
+      setInfo(data)
+    } catch {
+      setInfo(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (sessionData?.user) refresh()
+    else setInfo(null)
+  }, [sessionData?.user, refresh])
+
+  const setRemaining = React.useCallback((remaining: number) => {
+    setInfo((prev) =>
+      prev
+        ? { ...prev, charsRemaining: remaining, charsUsed: prev.charLimit - remaining }
+        : prev,
+    )
+  }, [])
+
+  const value: CreditsContextValue = {
+    plan: info?.plan ?? 'free',
+    charLimit: info?.charLimit ?? 15000,
+    charsUsed: info?.charsUsed ?? 0,
+    charsRemaining: info?.charsRemaining ?? 0,
+    periodEnd: info?.periodEnd ?? null,
+    loading,
+    refresh,
+    setRemaining,
+  }
 
   return (
-    <CreditsContext.Provider value={{ balance, plan, spend, add }}>
-      {children}
-    </CreditsContext.Provider>
+    <CreditsContext.Provider value={value}>{children}</CreditsContext.Provider>
   )
 }

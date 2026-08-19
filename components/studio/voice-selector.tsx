@@ -27,13 +27,10 @@ export function VoiceSelector({
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="h-9 w-full justify-between">
         {selected ? (
-          <span className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-muted-foreground">
-              {selected.flag}
-            </span>
+          <span className="flex items-center gap-2 truncate">
             <span className="font-medium">{selected.name}</span>
-            <span className="text-xs text-muted-foreground">
-              {selected.accent}
+            <span className="truncate text-xs text-muted-foreground">
+              {selected.accent || selected.language}
             </span>
           </span>
         ) : (
@@ -46,9 +43,6 @@ export function VoiceSelector({
             <SelectLabel>Minhas vozes clonadas</SelectLabel>
             {cloned.map((v) => (
               <SelectItem key={v.id} value={v.id}>
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {v.flag}
-                </span>
                 <span className="font-medium">{v.name}</span>
                 <Badge variant="secondary" className="ml-auto text-[10px]">
                   Clone
@@ -58,14 +52,13 @@ export function VoiceSelector({
           </SelectGroup>
         )}
         <SelectGroup>
-          <SelectLabel>Vozes nativas</SelectLabel>
+          <SelectLabel>Vozes nativas (LMNT)</SelectLabel>
           {native.map((v) => (
             <SelectItem key={v.id} value={v.id}>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {v.flag}
-              </span>
               <span className="font-medium">{v.name}</span>
-              <span className="text-xs text-muted-foreground">{v.accent}</span>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {v.accent || v.language}
+              </span>
             </SelectItem>
           ))}
         </SelectGroup>

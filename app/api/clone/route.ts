@@ -1,9 +1,23 @@
 import { NextResponse } from 'next/server'
+import { createVoice } from '@/lib/lmnt'
+import { getSession } from '@/lib/session'
+import { db } from '@/lib/db'
+import { clonedVoice } from '@/lib/db/schema'
+import {
+  normalizeGender,
+  parseLanguage,
+  type Voice,
+} from '@/lib/voices'
 
 export const runtime = 'nodejs'
-export const maxDuration = 30
+export const maxDuration = 60
 
 export async function POST(req: Request) {
+  const session = await getSession()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  }
+
   let form: FormData
   try {
     form = await req.formData()
@@ -15,8 +29,9 @@ export async function POST(req: Request) {
   }
 
   const name = (form.get('name') as string | null)?.trim() ?? ''
-  const language = (form.get('language') as string | null)?.trim() ?? 'pt-BR'
-  const gender = (form.get('gender') as string | null)?.trim() ?? 'female'
+  const description =
+    (form.get('description') as string | null)?.trim() || undefined
+  const gender = (form.get('gender') as string | null)?.trim() || undefined
   const consent = form.get('consent') === 'true'
   const file = form.get('audio')
 
@@ -42,52 +57,43 @@ export async function POST(req: Request) {
     )
   }
 
-  const lmntKey = req.headers.get('x-lmnt-key') || process.env.LMNT_API_KEY || ''
+  try {
+    const created = await createVoice({ name, file, description, gender })
 
-  // With an LMNT key, dispatch the real instant-clone request.
-  if (lmntKey) {
+    // Persiste a referência da voz clonada para o usuário.
     try {
-      const upstream = new FormData()
-      upstream.append('name', name)
-      upstream.append('enhance', 'true')
-      upstream.append('type', 'instant')
-      upstream.append('files', file, file.name || 'sample.wav')
-
-      const res = await fetch('https://api.lmnt.com/v1/ai/voice/create', {
-        method: 'POST',
-        headers: { 'X-API-Key': lmntKey },
-        body: upstream,
+      await db.insert(clonedVoice).values({
+        userId: session.user.id,
+        lmntVoiceId: created.id,
+        name: created.name,
+        description: created.description ?? null,
+        gender: created.gender ?? null,
       })
-      if (res.ok) {
-        const data = await res.json()
-        return NextResponse.json({
-          voice: {
-            id: data.id ?? `cloned-${Date.now()}`,
-            name,
-            language,
-            gender,
-            category: 'cloned',
-            engine: 'lmnt',
-          },
-        })
-      }
-      console.log('[v0] LMNT clone failed:', res.status)
     } catch (err) {
-      console.log('[v0] LMNT clone error:', (err as Error).message)
+      console.log('[v0] save cloned voice error:', (err as Error).message)
     }
-  }
 
-  // Simulated instant clone (no key configured) — returns a synthetic voice id.
-  await new Promise((r) => setTimeout(r, 900))
-  return NextResponse.json({
-    voice: {
-      id: `cloned-${Date.now().toString(36)}`,
-      name,
-      language,
-      gender,
+    const { language, accent } = parseLanguage(created.description)
+    const voice: Voice = {
+      id: created.id,
+      name: created.name,
+      description: created.description ?? 'Voz clonada personalizada.',
+      gender: normalizeGender(created.gender),
+      owner: 'me',
       category: 'cloned',
-      engine: 'simulated',
-    },
-    simulated: true,
-  })
+      tags: created.tags ?? [],
+      previewUrl: created.preview_url,
+      state: created.state,
+      language,
+      accent,
+    }
+
+    return NextResponse.json({ voice })
+  } catch (err) {
+    console.log('[v0] LMNT clone error:', (err as Error).message)
+    return NextResponse.json(
+      { error: 'Falha ao clonar a voz na LMNT' },
+      { status: 502 },
+    )
+  }
 }

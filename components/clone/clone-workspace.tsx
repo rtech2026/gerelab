@@ -25,14 +25,13 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Recorder } from '@/components/clone/recorder'
 import { useVoices } from '@/components/voices-provider'
-import { getClientKey } from '@/lib/client-key'
 import { cn } from '@/lib/utils'
 import type { Voice } from '@/lib/voices'
 
 const LANGS = [
-  { code: 'PT-BR', label: 'Português (Brasil)', edge: 'pt-BR-FranciscaNeural', flag: 'BR', name: 'Português (Brasil)' },
-  { code: 'EN-US', label: 'English (US)', edge: 'en-US-AvaMultilingualNeural', flag: 'US', name: 'English (US)' },
-  { code: 'ES-ES', label: 'Español (España)', edge: 'es-ES-AlvaroNeural', flag: 'ES', name: 'Español (España)' },
+  { code: 'PT-BR', label: 'Português (Brasil)' },
+  { code: 'EN-US', label: 'English (US)' },
+  { code: 'ES-ES', label: 'Español (España)' },
 ]
 
 function StepBadge({ n, title }: { n: number; title: string }) {
@@ -90,42 +89,26 @@ export function CloneWorkspace() {
 
     setSubmitting(true)
     try {
-      const key = getClientKey()
+      const langInfo = LANGS.find((l) => l.code === lang)
       const fd = new FormData()
       fd.append('name', name.trim())
-      fd.append('language', lang)
+      fd.append(
+        'description',
+        `Voz clonada · ${langInfo?.label ?? lang}`,
+      )
       fd.append('gender', gender)
       fd.append('consent', 'true')
       fd.append('audio', file)
 
       const res = await fetch('/api/clone', {
         method: 'POST',
-        headers: key ? { 'x-lmnt-key': key } : {},
         body: fd,
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error ?? 'Falha na clonagem')
 
-      const langInfo = LANGS.find((l) => l.code === lang)!
-      const newVoice: Voice = {
-        id: data.voice.id,
-        name: name.trim(),
-        edgeVoice: langInfo.edge,
-        language: langInfo.name,
-        langCode: langInfo.code,
-        flag: langInfo.flag,
-        gender: gender as 'male' | 'female',
-        accent: 'Clone',
-        description: `Voz clonada a partir da sua amostra (${data.voice.engine}).`,
-        category: 'cloned',
-        tags: ['Clone', langInfo.code],
-      }
-      addCloned(newVoice)
-      toast.success(
-        data.simulated
-          ? 'Voz clonada (simulação). Adicione uma chave LMNT para clonagem real.'
-          : 'Voz clonada com sucesso!',
-      )
+      addCloned(data.voice as Voice)
+      toast.success('Voz clonada com sucesso na LMNT!')
       router.push('/library')
     } catch (err) {
       toast.error((err as Error).message)
